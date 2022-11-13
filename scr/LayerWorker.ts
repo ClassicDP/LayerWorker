@@ -42,6 +42,7 @@ if (isMainThread) {
             workerPool.push(worker)
         }
         console.timeEnd('online')
+        // await wait(3000)
         console.time('init')
         for (let i = 0; i < threadsCount; i++) {
             workerPool[i].postMessage({cmd: "init", data: data, t: Date.now()} as WorkerReq)
