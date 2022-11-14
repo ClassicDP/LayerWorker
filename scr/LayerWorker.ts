@@ -37,7 +37,7 @@ if (isMainThread) {
         let threadsCount = 8
         let workersPool: Worker[] = []
         let data = []
-        for (let i = 0; i < 128; i++) data.push(new Array(32))
+        for (let i = 0; i < 128; i++) data.push((new Array(32)).fill(0))
         console.time('online')
         for (let i = 0; i < threadsCount; i++)
             workersPool.push(new Worker(__filename, {workerData: {id: i}}))
