@@ -15,47 +15,46 @@ class Matrix {
 if (isMainThread) {
     let rout = async () => {
         let workersConfirm = async (workersPool: Worker[]) => {
-            let resolveFunc: Function
-            let count = workersPool.length
-            workersPool.forEach(worker =>
-                worker.on('message', (msg: WorkerRes) => {
-                    if (msg.res === 'done' && !--count) resolveFunc()
-                }))
-            return new Promise<void>(resolve => resolveFunc = resolve)
-        }
-        let workerOnline = async (worker: Worker) => {
-            let resolveFunc: Function
-            // worker.on('online', (msg: WorkerRes) => {
-            //     resolveFunc()
-            // })
-            worker.postMessage({cmd: "check",t: Date.now()} as WorkerReq)
-            worker.on('message', msg => {
-                if ((msg as WorkerRes).res === "start") {
-                    console.log('start: ', worker.threadId)
-                    resolveFunc()
-                }
+            return new Promise<void>(resolve => {
+                let count = workersPool.length
+                workersPool.forEach(worker =>
+                    worker.on('message', (msg: WorkerRes) => {
+                        if (msg.res === 'done' && !--count) resolve()
+                    }))
             })
-            return new Promise<void>(resolve => resolveFunc = () => resolve())
+        }
+        let workersOnline = async (workersPool: Worker[]) => {
+            return new Promise<void>(resolve => {
+                // worker.on('online', (msg: WorkerRes) => {
+                //     resolveFunc()
+                // })
+                let count = workersPool.length
+                workersPool.forEach(worker => {
+                    worker.postMessage({cmd: "check", t: Date.now()} as WorkerReq)
+                    worker.on('message', msg => {
+                        if ((msg as WorkerRes).res === "start" && !--count) resolve()
+                    })
+                })
+            })
         }
         let threadsCount = 8
-        let workerPool: Worker[] = []
+        let workersPool: Worker[] = []
         let data = []
 
         for (let i = 0; i < 128; i++) data.push([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         console.time('online')
         for (let i = 0; i < threadsCount; i++) {
             let worker = new Worker(__filename, {workerData: {id: i}})
-            await workerOnline(worker)
-            workerPool.push(worker)
+            workersPool.push(worker)
         }
+        await workersOnline(workersPool)
         console.timeEnd('online')
-        // await wait(3000)
         console.time('init')
         for (let i = 0; i < threadsCount; i++) {
-            workerPool[i].postMessage({cmd: "init", data: data, t: Date.now()} as WorkerReq)
-            workerPool.push(workerPool[i])
+            workersPool[i].postMessage({cmd: "init", data: data, t: Date.now()} as WorkerReq)
+            workersPool.push(workersPool[i])
         }
-        await workersConfirm(workerPool)
+        await workersConfirm(workersPool)
         console.timeEnd('init')
     }
     rout().then()
@@ -65,7 +64,7 @@ if (isMainThread) {
         console.log('req', workerData.id, Date.now() - msg.t)
         if (msg.cmd === "init") {
             matrix = new Matrix(msg.data as number[][])
-            for (let i = 0; i < 1e4; i++)
+            for (let i = 0; i < 2e4; i++)
                 matrix.w.forEach((v, i) =>
                     v.forEach((v, j) => matrix.w[i][j] = Math.sin(Math.random())))
             parentPort.postMessage({res: "done"} as WorkerRes)
