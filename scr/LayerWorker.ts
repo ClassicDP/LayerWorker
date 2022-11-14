@@ -25,14 +25,11 @@ if (isMainThread) {
         }
         let workersOnline = async (workersPool: Worker[]) => {
             return new Promise<void>(resolve => {
-                // worker.on('online', (msg: WorkerRes) => {
-                //     resolveFunc()
-                // })
                 let count = workersPool.length
                 workersPool.forEach(worker => {
                     worker.postMessage({cmd: "check", t: Date.now()} as WorkerReq)
-                    worker.on('message', msg => {
-                        if ((msg as WorkerRes).res === "start" && !--count) resolve()
+                    worker.on('message', (msg: WorkerRes) => {
+                        if (msg.res === "start" && !--count) resolve()
                     })
                 })
             })
@@ -40,13 +37,10 @@ if (isMainThread) {
         let threadsCount = 8
         let workersPool: Worker[] = []
         let data = []
-
-        for (let i = 0; i < 128; i++) data.push([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        for (let i = 0; i < 128; i++) data.push(new Array(32))
         console.time('online')
-        for (let i = 0; i < threadsCount; i++) {
-            let worker = new Worker(__filename, {workerData: {id: i}})
-            workersPool.push(worker)
-        }
+        for (let i = 0; i < threadsCount; i++)
+            workersPool.push(new Worker(__filename, {workerData: {id: i}}))
         await workersOnline(workersPool)
         console.timeEnd('online')
         console.time('init')
@@ -61,7 +55,7 @@ if (isMainThread) {
 } else {
     let matrix: Matrix
     parentPort.on('message', (msg: WorkerReq) => {
-        console.log('req', workerData.id, Date.now() - msg.t)
+        console.log('req worker id:', workerData.id, 'req lag:', Date.now() - msg.t)
         if (msg.cmd === "init") {
             matrix = new Matrix(msg.data as number[][])
             for (let i = 0; i < 2e4; i++)
