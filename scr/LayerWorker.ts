@@ -1,7 +1,7 @@
 import {workerData, parentPort, isMainThread, Worker} from "worker_threads"
 
-type WorkerReq = { cmd: 'init' | 'calc', data: number[][] | number, t: number }
-type WorkerRes = { res: 'done', data?: number | string }
+type WorkerReq = { cmd: 'init' | 'calc' | 'check', data: number[][] | number, t: number }
+type WorkerRes = { res: 'done' | 'start', data?: number | string }
 
 async function wait(ms: number) {
     return new Promise<void>(resolve => setTimeout(resolve, ms))
@@ -25,10 +25,17 @@ if (isMainThread) {
         }
         let workerOnline = async (worker: Worker) => {
             let resolveFunc: Function
-            worker.on('online', (msg: WorkerRes) => {
-                resolveFunc()
+            // worker.on('online', (msg: WorkerRes) => {
+            //     resolveFunc()
+            // })
+            worker.postMessage({cmd: "check",t: Date.now()} as WorkerReq)
+            worker.on('message', msg => {
+                if ((msg as WorkerRes).res === "start") {
+                    console.log('start: ', worker.threadId)
+                    resolveFunc()
+                }
             })
-            return new Promise<void>(resolve => resolveFunc = resolve)
+            return new Promise<void>(resolve => resolveFunc = () => resolve())
         }
         let threadsCount = 8
         let workerPool: Worker[] = []
@@ -37,7 +44,7 @@ if (isMainThread) {
         for (let i = 0; i < 128; i++) data.push([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         console.time('online')
         for (let i = 0; i < threadsCount; i++) {
-            let worker = new Worker(__filename, {workerData: {id:i}})
+            let worker = new Worker(__filename, {workerData: {id: i}})
             await workerOnline(worker)
             workerPool.push(worker)
         }
@@ -55,7 +62,7 @@ if (isMainThread) {
 } else {
     let matrix: Matrix
     parentPort.on('message', (msg: WorkerReq) => {
-        console.log('req', workerData.id ,Date.now() - msg.t)
+        console.log('req', workerData.id, Date.now() - msg.t)
         if (msg.cmd === "init") {
             matrix = new Matrix(msg.data as number[][])
             for (let i = 0; i < 1e4; i++)
@@ -63,6 +70,7 @@ if (isMainThread) {
                     v.forEach((v, j) => matrix.w[i][j] = Math.sin(Math.random())))
             parentPort.postMessage({res: "done"} as WorkerRes)
         }
+        if (msg.cmd === "check") parentPort.postMessage({res: "start"} as WorkerRes)
     })
 }
 
